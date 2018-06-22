@@ -123,6 +123,7 @@ end
 
 We use transaction so we rewrite this code like this. 
 
+```
 now = Time.current
 ActiveRecord::Base.transaction do
   r = IdempotentExecutor.find_by(user_id: user_id, type: type, signature: signature)
@@ -139,6 +140,7 @@ ActiveRecord::Base.transaction do
     raise IdempotentBlock::IdempotentError
   end 
 end
+```
 
 ## Development
 
