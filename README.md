@@ -60,47 +60,39 @@ end
 exec.finished?
 # => true
 
-# second time, we got error and didn't execute block
-exec.start do
-  user.user_posts.create(params[:new_post])
-end
-# => raise IdempotentBlock::IdempotentError
+exec.executed?
+# => true
 
-# if expired second passed, we didn't got error
-exec.start do
-  user.user_posts.create(params[:new_post])
-end
+# second time, we didn't execute block
 
-travel_to Time.current + expired_second
 exec.finished?
-# => false
+# => true
 
 exec.start do
   user.user_posts.create(params[:new_post])
 end
-# create two new post :(
+
+exec.executed?
+# => false
 ```
 
 ### Force execute
 When you pass force option, we always execute block and update state.
 
 ```ruby
+exec.finished?
+# => true
+
 exec.start(force: true) do
   user.user_posts.create(params[:new_post])
 end
-```
 
-### Change expired second
-
-You can change expired second every block.
-```ruby
-exec.start(force: true, expired_second: one_month_second) do
-  user.user_posts.create(params[:new_post])
-end
+exec.executed?
+# => true
 ```
 
 ### Stop execute block
-If you raise error in block, we stop execute block and reset state.
+If you raise error in block, we stop execute block and rollback state.
 
 ```ruby
 exec.start do
@@ -116,6 +108,7 @@ end
 
 ## Background
 ```ruby
+exec = IdemponentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
 exec.start do
   user.user_posts.create(params[:new_post])
 end
@@ -124,20 +117,23 @@ end
 We use transaction so we rewrite this code like this. 
 
 ```
+exec = IdemponentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
+
 now = Time.current
 ActiveRecord::Base.transaction do
   r = IdempotentExecutor.find_by(user_id: user_id, type: type, signature: signature)
   if r
-    raise IdempotentBlock::IdempotentError if r.expired_time < now
-    r.destroy # expire this record
+    exec.finish = true
+    break unless force
   end 
-   
+
   user.user_posts.create(params[:new_post])
 
   begin
     exec.save!
+    exec.executed = true
   rescue => ActiveRecord::RecordNotUnique
-    raise IdempotentBlock::IdempotentError
+    exec.executed = false
   end 
 end
 ```
