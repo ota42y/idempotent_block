@@ -9,5 +9,5 @@ ActiveRecord::Schema.define do
   end
 end
 
-class UserPost < ActiveRecord::Base
+class UserPost < ApplicationRecord
 end

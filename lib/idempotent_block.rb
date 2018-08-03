@@ -1,8 +1,6 @@
-require "idempotent_block/version"
+require 'idempotent_block/version'
 
 module IdempotentBlock
-
-
   def self.included(base)
     base.extend(ClassMethods)
   end
@@ -45,6 +43,6 @@ module IdempotentBlock
   private
 
     def record_exist?
-      self.class.exists?(self.class.idempotent_columns.map{ |k| [k, send(k)]}.to_h)
+      self.class.exists?(self.class.idempotent_columns.map { |k| [k, send(k)] }.to_h)
     end
 end

@@ -2,9 +2,7 @@ require 'models/user_post'
 require 'models/idempotent_executor'
 
 RSpec.describe IdempotentBlock do
-
-
-  it "correct" do
+  it 'correct' do
     user_id = 1
 
     exec_1 = IdempotentExecutor.new(user_id: user_id, block_type: :post_create, signature: 'abcdefg')
@@ -32,7 +30,7 @@ RSpec.describe IdempotentBlock do
     expect(exec_2.executed?).to eq false
   end
 
-  it "block raise error" do
+  it 'block raise error' do
     user_id = 1
 
     exec_1 = IdempotentExecutor.new(user_id: user_id, block_type: :post_create, signature: 'abcdefg')
@@ -44,7 +42,7 @@ RSpec.describe IdempotentBlock do
         UserPost.create!(user_id: user_id, title: 'test post 1')
         raise 'block raise error'
       end
-    end.to raise_error(StandardError).with_message('block raise error')
+    end.to raise_error(StandardError).with_message('block raise error') # rubocop:disable Style/MethodCalledOnDoEndBlock
 
     expect(IdempotentExecutor.count).to eq 0
     expect(UserPost.count).to eq 0
@@ -52,7 +50,7 @@ RSpec.describe IdempotentBlock do
     expect(exec_1.executed?).to eq false
   end
 
-  it "block raise RecordNotUnique" do
+  it 'block raise RecordNotUnique' do
     user_id = 1
 
     exec_1 = IdempotentExecutor.new(user_id: user_id, block_type: :post_create, signature: 'abcdefg')
@@ -62,9 +60,9 @@ RSpec.describe IdempotentBlock do
     expect do
       exec_1.start do
         UserPost.create!(user_id: user_id, title: 'test post 1')
-        raise ActiveRecord::RecordNotUnique, "not unique"
+        raise ActiveRecord::RecordNotUnique, 'not unique'
       end
-    end.to raise_error(ActiveRecord::RecordNotUnique).with_message("not unique")
+    end.to raise_error(ActiveRecord::RecordNotUnique).with_message('not unique') # rubocop:disable Style/MethodCalledOnDoEndBlock
 
     expect(IdempotentExecutor.count).to eq 0
     expect(UserPost.count).to eq 0
@@ -72,7 +70,7 @@ RSpec.describe IdempotentBlock do
     expect(exec_1.executed?).to eq false
   end
 
-  it "block raise rollback" do
+  it 'block raise rollback' do
     user_id = 1
 
     exec_1 = IdempotentExecutor.new(user_id: user_id, block_type: :post_create, signature: 'abcdefg')
@@ -81,7 +79,7 @@ RSpec.describe IdempotentBlock do
 
     exec_1.start do
       UserPost.create!(user_id: user_id, title: 'test post 1')
-      raise ActiveRecord::Rollback, "rallback"
+      raise ActiveRecord::Rollback, 'rallback'
     end
 
     expect(IdempotentExecutor.count).to eq 0
