@@ -13,10 +13,10 @@ class IdempotentExecutor < ApplicationRecord
   #
   #  unique_index  (user_id, type, signature) UNIQUE
 
-  include IdemponentBlock
+  include IdempotentBlock
 end
 
-exec = IdemponentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
+exec = IdempotentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
 exec.start do
   user.user_posts.create(params[:new_post])
 end
@@ -47,32 +47,42 @@ Or install it yourself as:
 
 ### Basic
 ```ruby
-exec = IdempotentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
+exec_1 = IdempotentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
 
 # first time, we got no error and executed block 
-exec.finished?
+exec_1.finished?
 # => false
 
 exec.start do
   user.user_posts.create(params[:new_post])
 end
 
-exec.finished?
+user.user_posts.count
+# => 1
+
+exec_1.finished?
 # => true
 
-exec.executed?
+exec_1.executed?
 # => true
 
 # second time, we didn't execute block
-
-exec.finished?
+exec_2 = IdempotentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
+exec_2.finished?
 # => true
+exec_2.executed?
+# => false
 
-exec.start do
+exec_2.start do
   user.user_posts.create(params[:new_post])
 end
 
-exec.executed?
+user.user_posts.count
+# => 1 we don't execute block
+
+exec_2.finished?
+# => true
+exec_2.executed?
 # => false
 ```
 
