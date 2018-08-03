@@ -122,7 +122,7 @@ end
 
 ## Background
 ```ruby
-exec = IdemponentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
+exec = IdempotentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
 exec.start do
   user.user_posts.create(params[:new_post])
 end
@@ -133,20 +133,15 @@ We use transaction so we rewrite this code like this.
 ```
 exec = IdempotentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
 
-now = Time.current
 ActiveRecord::Base.transaction do
-  r = IdempotentExecutor.find_by(user_id: user_id, type: type, signature: signature)
-  if r
-    exec.finish = true
-    break unless force
-  end 
-
   user.user_posts.create(params[:new_post])
 
   begin
     exec.save!
     exec.executed = true
+    exec.finished = true
   rescue => ActiveRecord::RecordNotUnique
+    exec.finished = true
     exec.executed = false
   end 
 end
