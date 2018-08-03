@@ -1,3 +1,4 @@
+require 'models/application_record'
 require 'models/user_post'
 require 'models/idempotent_executor'
 
@@ -86,5 +87,27 @@ RSpec.describe IdempotentBlock do
     expect(UserPost.count).to eq 0
     expect(exec_1.finished?).to eq false
     expect(exec_1.executed?).to eq false
+  end
+
+  it 'force execute' do
+    user_id = 1
+
+    exec_1 = IdempotentExecutor.new(user_id: user_id, block_type: :post_create, signature: 'abcdefg')
+    exec_1.start do
+      UserPost.create!(user_id: user_id, title: 'test post 1')
+    end
+
+    exec_2 = IdempotentExecutor.new(user_id: user_id, block_type: :post_create, signature: 'abcdefg')
+    expect(exec_2.finished?).to eq true
+    expect(exec_2.executed?).to eq false
+
+    exec_2.start(force: true) do
+      UserPost.create!(user_id: user_id, title: 'test post 1')
+    end
+
+    expect(UserPost.count).to eq 2
+    expect(IdempotentExecutor.count).to eq 1
+    expect(exec_2.finished?).to eq true
+    expect(exec_2.executed?).to eq true
   end
 end

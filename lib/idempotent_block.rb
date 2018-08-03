@@ -23,20 +23,18 @@ module IdempotentBlock
     @executed ||= false
   end
 
-  def start
+  def start(force: false)
     self.class.transaction do
       yield
 
       begin
         save!
-        @finished = true
-        @executed = true
       rescue ActiveRecord::RecordNotUnique
-        @finished = true
-        @executed = false
-
-        raise ActiveRecord::Rollback
+        raise ActiveRecord::Rollback unless force
       end
+
+      @finished = true
+      @executed = true
     end
   end
 
