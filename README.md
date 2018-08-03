@@ -5,7 +5,7 @@ This gem execute passed block by once using database unique key.
 ```ruby
 class IdempotentExecutor < ApplicationRecord
   #  user_id             :bigint(8)      not null
-  #  type                :integer(11)    not null
+  #  block_type          :integer(11)    not null
   #  signature           :string(255)    not null
   #  expired_time        :datetime       not null
   #
@@ -14,9 +14,13 @@ class IdempotentExecutor < ApplicationRecord
   #  unique_index  (user_id, type, signature) UNIQUE
 
   include IdempotentBlock
+
+  enum block_type: [:post_create]
+
+  register_idempotent_column :user_id, :block_type, :signature
 end
 
-exec = IdempotentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
+exec = IdempotentExecutor.new(user_id: user.id, block_type: :post_create, signature: 'abcdefg')
 exec.start do
   user.user_posts.create(params[:new_post])
 end
@@ -47,7 +51,7 @@ Or install it yourself as:
 
 ### Basic
 ```ruby
-exec_1 = IdempotentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
+exec_1 = IdempotentExecutor.new(user_id: user.id, block_type: :post_create, signature: 'abcdefg')
 
 # first time, we got no error and executed block 
 exec_1.finished?
@@ -67,7 +71,7 @@ exec_1.executed?
 # => true
 
 # second time, we didn't execute block
-exec_2 = IdempotentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
+exec_2 = IdempotentExecutor.new(user_id: user.id, block_type: :post_create, signature: 'abcdefg')
 exec_2.finished?
 # => true
 exec_2.executed?
