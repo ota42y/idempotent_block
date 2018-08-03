@@ -5,7 +5,7 @@ This gem execute passed block by once using database unique key.
 ```ruby
 class IdempotentExecutor < ApplicationRecord
   #  user_id             :bigint(8)      not null
-  #  type                :integer(11)    not null
+  #  block_type          :integer(11)    not null
   #  signature           :string(255)    not null
   #  expired_time        :datetime       not null
   #
@@ -13,10 +13,14 @@ class IdempotentExecutor < ApplicationRecord
   #
   #  unique_index  (user_id, type, signature) UNIQUE
 
-  include IdemponentBlock
+  include IdempotentBlock
+
+  enum block_type: [:post_create]
+
+  register_idempotent_column :user_id, :block_type, :signature
 end
 
-exec = IdemponentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
+exec = IdempotentExecutor.new(user_id: user.id, block_type: :post_create, signature: 'abcdefg')
 exec.start do
   user.user_posts.create(params[:new_post])
 end
@@ -47,60 +51,62 @@ Or install it yourself as:
 
 ### Basic
 ```ruby
-exec = IdemponentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
+exec_1 = IdempotentExecutor.new(user_id: user.id, block_type: :post_create, signature: 'abcdefg')
 
 # first time, we got no error and executed block 
-exec.finished?
+exec_1.finished?
 # => false
 
 exec.start do
   user.user_posts.create(params[:new_post])
 end
 
-exec.finished?
+user.user_posts.count
+# => 1
+
+exec_1.finished?
 # => true
 
-# second time, we got error and didn't execute block
-exec.start do
-  user.user_posts.create(params[:new_post])
-end
-# => raise IdempotentBlock::IdempotentError
+exec_1.executed?
+# => true
 
-# if expired second passed, we didn't got error
-exec.start do
-  user.user_posts.create(params[:new_post])
-end
-
-travel_to Time.current + expired_second
-exec.finished?
+# second time, we didn't execute block
+exec_2 = IdempotentExecutor.new(user_id: user.id, block_type: :post_create, signature: 'abcdefg')
+exec_2.finished?
+# => true
+exec_2.executed?
 # => false
 
-exec.start do
+exec_2.start do
   user.user_posts.create(params[:new_post])
 end
-# create two new post :(
+
+user.user_posts.count
+# => 1 we don't execute block
+
+exec_2.finished?
+# => true
+exec_2.executed?
+# => false
 ```
 
 ### Force execute
 When you pass force option, we always execute block and update state.
 
 ```ruby
+exec.finished?
+# => true
+
 exec.start(force: true) do
   user.user_posts.create(params[:new_post])
 end
-```
 
-### Change expired second
-
-You can change expired second every block.
-```ruby
-exec.start(force: true, expired_second: one_month_second) do
-  user.user_posts.create(params[:new_post])
-end
+exec.executed?
+# => true
 ```
 
 ### Stop execute block
-If you raise error in block, we stop execute block and reset state.
+If you raise error in block, we stop execute block and rollback state.
 
 ```ruby
 exec.start do
@@ -116,6 +122,7 @@ end
 
 ## Background
 ```ruby
+exec = IdempotentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
 exec.start do
   user.user_posts.create(params[:new_post])
 end
@@ -124,20 +131,18 @@ end
 We use transaction so we rewrite this code like this. 
 
 ```
-now = Time.current
+exec = IdempotentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
+
 ActiveRecord::Base.transaction do
-  r = IdempotentExecutor.find_by(user_id: user_id, type: type, signature: signature)
-  if r
-    raise IdempotentBlock::IdempotentError if r.expired_time < now
-    r.destroy # expire this record
-  end 
-   
   user.user_posts.create(params[:new_post])
 
   begin
     exec.save!
+    exec.executed = true
+    exec.finished = true
   rescue => ActiveRecord::RecordNotUnique
-    raise IdempotentBlock::IdempotentError
+    exec.finished = true
+    exec.executed = false
   end 
 end
 ```
