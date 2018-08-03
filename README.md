@@ -47,7 +47,7 @@ Or install it yourself as:
 
 ### Basic
 ```ruby
-exec = IdemponentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
+exec = IdempotentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
 
 # first time, we got no error and executed block 
 exec.finished?
@@ -117,7 +117,7 @@ end
 We use transaction so we rewrite this code like this. 
 
 ```
-exec = IdemponentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
+exec = IdempotentExecutor.new(user_id: user.id, type: :post_create, signature: 'abcdefg')
 
 now = Time.current
 ActiveRecord::Base.transaction do
